@@ -857,3 +857,10 @@ NEXT for Linux:
 - Runtime-test WebDAV/S3/FTP (spin the docker test servers).
 - Packaging (AppImage / .deb).
 - x86 AES-NI correctness is the one known perf TODO (currently software AES).
+
+## File comparison (2026-11-11)
+
+Added read-only local/remote comparison; see FILE-COMPARISON.md for scope and limits.
+The Qt comparison component compiles and its six offscreen regression cases pass on
+Linux with Qt 6.8. The integrated main.cpp passes a compiler syntax check. Full native
+application linking and macOS/live-server validation remain unverified for this change.

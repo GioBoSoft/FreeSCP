@@ -31,7 +31,7 @@ set(WINSCP_ICNS ${CMAKE_CURRENT_SOURCE_DIR}/winscp.icns)
 set(CMAKE_AUTORCC ON)
 # Single source of truth for the app version (shown in About + baked into the bundle).
 set(FREESCP_VERSION "0.1.1")
-add_executable(winscp-qt MACOSX_BUNDLE main.cpp resources.qrc ${WINSCP_ICNS})
+add_executable(winscp-qt MACOSX_BUNDLE main.cpp filecompare.cpp resources.qrc ${WINSCP_ICNS})
 target_compile_definitions(winscp-qt PRIVATE FREESCP_VERSION="${FREESCP_VERSION}")
 if(APPLE)
   set_source_files_properties(${WINSCP_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
@@ -56,3 +56,11 @@ target_link_libraries(winscp-qt PRIVATE
   neon expat libs3                        # Phase 4: WebDAV + S3 deps, on-demand
   winscpfilezilla                         # Phase 8: FTP backend
   OpenSSL::SSL OpenSSL::Crypto)
+
+# Independent UI regression tests; no engine connection required.
+if(BUILD_TESTING)
+  add_executable(filecompare-test tests/filecompare_test.cpp filecompare.cpp)
+  target_link_libraries(filecompare-test PRIVATE Qt6::Widgets)
+  add_test(NAME filecompare COMMAND filecompare-test)
+  set_tests_properties(filecompare PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()

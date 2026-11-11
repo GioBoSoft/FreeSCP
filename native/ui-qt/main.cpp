@@ -1,3 +1,5 @@
+#include "filecompare.h"
+#include <QTemporaryDir>
 //---------------------------------------------------------------------------
 // WinSCP native port — Qt 6 GUI, faithful to WinSCP's Commander interface.
 //
@@ -1586,6 +1588,31 @@ int main(int argc, char ** argv)
     };
     ed->show();
   };
+  auto doCompare = [&] {
+    FilePanel * lp = left->isRemote() ? right : left;
+    FilePanel * rp = left->isRemote() ? left : right;
+    if (!rp->isRemote() || lp->isRemote() || busy()) return;
+    auto local = lp->selectedFiles(), remote = rp->selectedFiles();
+    if (local.size() != 1 || remote.size() != 1) {
+      appMessage(&window, "Compare files", "Select one local file and one remote file."); return;
+    }
+    QString localPath = lp->path() + "/" + local.first();
+    if (!QFileInfo(localPath).isFile() || QFileInfo(localPath).size() > 8 * 1024 * 1024) {
+      appMessage(&window, "Compare files", "Select regular files up to 8 MiB."); return;
+    }
+    std::string remotePath = engine::joinPath(s8(rp->path()), s8(remote.first()));
+    for (const auto & entry : engine::listRemoteDir(s8(rp->path())))
+      if (entry.name == s8(remote.first()) && (entry.isDir || entry.size > 8 * 1024 * 1024)) {
+        appMessage(&window, "Compare files", "Select regular files up to 8 MiB."); return;
+      }
+    QTemporaryDir temp;
+    if (!temp.isValid()) { appMessage(&window, "Compare files", "Cannot create temporary directory."); return; }
+    std::string error;
+    if (!engine::downloadFromRemote(remotePath, s8(temp.path()), &error)) {
+      appMessage(&window, "Compare files", u8(error)); return;
+    }
+    showFileComparison(&window, localPath, temp.filePath(remote.first()), u8(remotePath));
+  };
   auto doQuit = [&] { window.close(); };
 
   // Synchronize directories (local panel <-> remote panel) via the engine's TSynchronizeChecklist.
@@ -1764,6 +1791,7 @@ int main(int argc, char ** argv)
       left->refresh(); right->refresh();
     });
     auto * mCommands = window.menuBar()->addMenu("&Commands");
+    mCommands->addAction("Compare &files…", doCompare);
     mCommands->addAction("Open &Terminal\tCtrl+T", doOpenTerminal);
     mCommands->addAction("&Synchronize\xE2\x80\xA6\tCtrl+S", doSync);
     { auto * a = new QAction(&window); a->setShortcut(Qt::CTRL | Qt::Key_S);
