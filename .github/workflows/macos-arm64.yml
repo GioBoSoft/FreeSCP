@@ -1,0 +1,44 @@
+name: macOS Apple Silicon
+on:
+  push:
+    branches: [feature/file-comparison]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check architecture
+        run: test "$(uname -m)" = arm64
+      - name: Install dependencies
+        run: brew install qt cmake ninja nasm autoconf automake libtool pkg-config openssl@3
+      - name: Configure
+        run: |
+          cmake -S native -B native/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
+            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
+      - name: Build application and tests
+        run: cmake --build native/build --parallel 3
+      - name: Run tests
+        run: ctest --test-dir native/build --output-on-failure
+      - name: Package application
+        run: |
+          mkdir -p native/build/package
+          cp -R native/build/ui-qt/winscp-qt.app native/build/package/FreeSCP.app
+          "$(brew --prefix qt)/bin/macdeployqt" native/build/package/FreeSCP.app -no-strip
+          codesign --force --deep --sign - native/build/package/FreeSCP.app
+          codesign --verify --deep --strict native/build/package/FreeSCP.app
+          lipo -verify_arch arm64 native/build/package/FreeSCP.app/Contents/MacOS/winscp-qt
+          ditto -c -k --keepParent native/build/package/FreeSCP.app native/build/FreeSCP-macOS-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeSCP-macOS-arm64
+          path: native/build/FreeSCP-macOS-arm64.zip
+          if-no-files-found: error
+          retention-days: 14
