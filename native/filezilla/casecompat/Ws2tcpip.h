@@ -1,4 +1,4 @@
-// Case-exact forwarding shim. source/filezilla includes <Ws2tcpip.h> (capital W); the real
-// compat header is winapi/ws2tcpip.h (lowercase). macOS's case-insensitive filesystem resolves
-// the mismatch silently; Linux is case-sensitive, so we forward here. No source/ edit.
-#include <ws2tcpip.h>
+// Use an explicit path: a case-only include can resolve back to this shim
+// on case-insensitive macOS filesystems. Keep the upstream source unchanged.
+#pragma once
+#include "../../rtlcompat/include/winapi/ws2tcpip.h"

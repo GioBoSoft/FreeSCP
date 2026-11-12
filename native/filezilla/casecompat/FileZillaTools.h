@@ -1,4 +1,4 @@
-// Case-exact forwarding shim. source/filezilla/FileZillaIntf.h includes <FileZillaTools.h>
-// (capital Z); the real file is source/filezilla/FilezillaTools.h (lowercase z). macOS's
-// case-insensitive filesystem hides the mismatch; Linux is case-sensitive. No source/ edit.
-#include <FilezillaTools.h>
+// Use an explicit path: a case-only include can resolve back to this shim
+// on case-insensitive macOS filesystems. Keep the upstream source unchanged.
+#pragma once
+#include "../../../source/filezilla/FilezillaTools.h"

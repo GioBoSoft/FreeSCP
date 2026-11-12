@@ -1,2 +1,4 @@
-// Case-exact forwarding shim (Linux is case-sensitive; macOS FS is not). No source/ edit.
-#include <TransferSocket.h>
+// Use an explicit path: a case-only include can resolve back to this shim
+// on case-insensitive macOS filesystems. Keep the upstream source unchanged.
+#pragma once
+#include "../../../source/filezilla/TransferSocket.h"
