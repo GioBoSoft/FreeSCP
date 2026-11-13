@@ -34,7 +34,7 @@ jobs:
           "$(brew --prefix qt)/bin/macdeployqt" native/build/package/FreeSCP.app -no-strip
           codesign --force --deep --sign - native/build/package/FreeSCP.app
           codesign --verify --deep --strict native/build/package/FreeSCP.app
-          lipo -verify_arch arm64 native/build/package/FreeSCP.app/Contents/MacOS/winscp-qt
+          lipo native/build/package/FreeSCP.app/Contents/MacOS/winscp-qt -verify_arch arm64
           ditto -c -k --keepParent native/build/package/FreeSCP.app native/build/FreeSCP-macOS-arm64.zip
       - uses: actions/upload-artifact@v4
         with:

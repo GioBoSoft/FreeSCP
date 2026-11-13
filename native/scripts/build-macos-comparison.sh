@@ -36,7 +36,7 @@ cp -R "$BUILD_DIR/ui-qt/winscp-qt.app" "$APP_PATH"
 "$(brew --prefix qt)/bin/macdeployqt" "$APP_PATH" -no-strip
 codesign --force --deep --sign - "$APP_PATH"
 codesign --verify --deep --strict "$APP_PATH"
-lipo -verify_arch arm64 "$APP_PATH/Contents/MacOS/winscp-qt"
+lipo "$APP_PATH/Contents/MacOS/winscp-qt" -verify_arch arm64
 ditto -c -k --keepParent "$APP_PATH" "$PACKAGE_DIR/FreeSCP-macOS-arm64.zip"
 printf '\nApplication: %s\nZIP: %s\nLog: %s\n' "$APP_PATH" "$PACKAGE_DIR/FreeSCP-macOS-arm64.zip" "$BUILD_DIR/build.log"
 echo 'Development build with ad-hoc signing; not notarized by Apple.'
