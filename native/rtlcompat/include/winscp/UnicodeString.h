@@ -92,8 +92,19 @@ public:
   // Pos(sub) — 1-based index of first match, 0 if none (Delphi).
   int Pos(const UnicodeString & sub) const
   {
-    std::u16string::size_type p = FData.find(sub.FData);
-    return (p == std::u16string::npos) ? 0 : static_cast<int>(p) + 1;
+    // Keep this independent of libc++'s optimized string search.  The engine is
+    // built with -fshort-wchar and Apple libc++ is built for the platform's
+    // normal 4-byte wchar_t ABI; a simple UTF-16 search is both portable and
+    // faithful to Delphi's 1-based Pos semantics.
+    if (sub.FData.empty()) return 1;
+    if (sub.FData.size() > FData.size()) return 0;
+    for (size_t i = 0; i + sub.FData.size() <= FData.size(); ++i)
+    {
+      size_t j = 0;
+      while (j < sub.FData.size() && FData[i + j] == sub.FData[j]) ++j;
+      if (j == sub.FData.size()) return static_cast<int>(i) + 1;
+    }
+    return 0;
   }
 
   void SetLength(int len) { FData.resize(static_cast<size_t>(len)); }

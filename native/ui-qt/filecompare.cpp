@@ -66,8 +66,10 @@ void showFileComparison(QWidget * parent, const QString & localPath,
   int li = 0, ri = 0;
   auto append = [&](bool l, bool r, bool change) {
     if (change) changed << displayLeft.size();
-    displayLeft << (l ? QString::number(li + 1) + "  " + left[li++] : QString());
-    displayRight << (r ? QString::number(ri + 1) + "  " + right[ri++] : QString());
+    if (l) { displayLeft << QString::number(li + 1) + "  " + left[li]; ++li; }
+    else displayLeft << QString();
+    if (r) { displayRight << QString::number(ri + 1) + "  " + right[ri]; ++ri; }
+    else displayRight << QString();
   };
   QRegularExpression header("^(\\d+)(?:,(\\d+))?([acd])(\\d+)(?:,(\\d+))?$");
   for (const QString & line : QString::fromUtf8(diff.readAllStandardOutput()).split('\n'))
