@@ -3,68 +3,68 @@
 Minimal, guarded edits to source/ for the native port. Each is `#ifdef`-guarded so the
 Windows/C++Builder build is byte-identical.
 
-- **source/putty/defs.h** — `HAVE_AES_NI` guarded by `_WIN32` AND x86: only the upstream Windows x86
+- **source/putty/defs.h** â `HAVE_AES_NI` guarded by `_WIN32` AND x86: only the upstream Windows x86
   build uses hardware AES-NI; the native port (macOS arm64 + Linux x86) uses software AES. (Was
-  unconditional `1` under WINSCP; the native AES-NI build garbles decryption — see the Linux section.)
-- **source/core/SecureShell.h** — `typedef UINT_PTR SOCKET;` wrapped in `#ifdef _WIN32`; the
+  unconditional `1` under WINSCP; the native AES-NI build garbles decryption â see the Linux section.)
+- **source/core/SecureShell.h** â `typedef UINT_PTR SOCKET;` wrapped in `#ifdef _WIN32`; the
   `#else` branch is `typedef int SOCKET;`, identical to PuTTY platform.h's own
   `typedef int SOCKET` so the two coexist as a legal redefinition. This keeps the header
   self-contained for the header-parse guard (which omits putty includes) while matching the
-  putty backend's fd type. Avoids the engine↔putty SOCKET type clash.
-- **source/core/PuttyIntf.cpp** — `HasGSSAPI()` body guarded with `#ifdef NO_GSSAPI` (returns
+  putty backend's fd type. Avoids the engineâputty SOCKET type clash.
+- **source/core/PuttyIntf.cpp** â `HasGSSAPI()` body guarded with `#ifdef NO_GSSAPI` (returns
   false); GSSAPI/Kerberos is not yet wired on the native build.
-- **source/core/Terminal.h** — under `#ifndef _WIN32`, two inline bridges `WinscpToEventEx` /
+- **source/core/Terminal.h** â under `#ifndef _WIN32`, two inline bridges `WinscpToEventEx` /
   `WinscpToEvent` between the 3-arg `TProcessFileEvent` and 4-arg `TProcessFileEventEx`. Delphi
   permits casting between these closures; the ported `std::function` types can't convert, so
   genprops rewrites the two arity casts in Terminal.cpp to call these. Compiled out on Windows
   (the typedefs are `__closure`s there).
-- **source/core/FileBuffer.h / FileBuffer.cpp** — extra `TSafeHandleStream(void *)` ctor under
+- **source/core/FileBuffer.h / FileBuffer.cpp** â extra `TSafeHandleStream(void *)` ctor under
   `#ifndef _WIN32`. Native callers cast OS file handles to `THandle` (which is `void*` in the
   rtlcompat layer, since it doubles as the Win threading HANDLE), so the existing `(int)` ctor
   doesn't match; the new ctor unpacks the fd via `reinterpret_cast<intptr_t>`. On Windows
   `THandle` is integer-convertible so the `(int)` ctor already serves and this is compiled out.
 
-- **source/core/Common.h** — `IsWideChar` made `inline` (was a non-inline function body in a
-  header → ODR multiple-definition once more than one TU odr-uses it under clang). `inline` is
+- **source/core/Common.h** â `IsWideChar` made `inline` (was a non-inline function body in a
+  header â ODR multiple-definition once more than one TU odr-uses it under clang). `inline` is
   valid on every compiler; no behavior change.
-- **source/core/Terminal.cpp** — the FTP/WebDAV/S3 branches of `TTerminal::Open()` are guarded
+- **source/core/Terminal.cpp** â the FTP/WebDAV/S3 branches of `TTerminal::Open()` are guarded
   `#ifdef _WIN32`; on the native build they `throw` "not supported yet" instead of instantiating
   `T{FTP,WebDAV,S3}FileSystem` (those backends are Phase 4). Keeps the engine SFTP/SCP-only so it
   links without pulling the unported filesystem classes.
-- **source/core/SessionInfo.cpp** — `TSessionLog::GetCmdLineLog` guards the `TManagementScript`
+- **source/core/SessionInfo.cpp** â `TSessionLog::GetCmdLineLog` guards the `TManagementScript`
   (scripting, unported) password-masking under `#ifdef _WIN32`; the headless engine logs no
   command line so there is nothing to mask.
-- **source/core/SftpFileSystem.cpp** — `TSFTPPacket::PeekCardinal/GetCardinal/CanGetCardinal`
+- **source/core/SftpFileSystem.cpp** â `TSFTPPacket::PeekCardinal/GetCardinal/CanGetCardinal`
   used `sizeof(unsigned long)` for the SFTP 4-byte cardinal. `unsigned long` is 8 bytes on LP64
   (macOS/Linux) vs 4 on Windows (LLP64), so reads over-consumed 4 bytes each and desynced every
   SFTP response (e.g. SSH_FXP_NAME count came out as 7 instead of 1). Hardcoded the cardinal width
-  to 4 — identical to `sizeof(unsigned long)` on Windows, so no behavior change there.
-- **source/core/Configuration.cpp** — `GetStorage()` resolves `stDetect` to `stIniFile` under
+  to 4 â identical to `sizeof(unsigned long)` on Windows, so no behavior change there.
+- **source/core/Configuration.cpp** â `GetStorage()` resolves `stDetect` to `stIniFile` under
   `#ifndef _WIN32`. There is no Windows registry on the native port, so storage (incl. host-key
   storage, which otherwise built a registry-backed `TRegistryStorage` whose `RootKey==NULL` made
   `RootKeyToStr` call `Abort()` during host-key save) must be INI/file-backed. On Windows the
   detection is overridden by TWinConfiguration as before.
-- **source/putty/be_list.c** / **source/putty/settings.c** — `appname` and `get_remote_username`
+- **source/putty/be_list.c** / **source/putty/settings.c** â `appname` and `get_remote_username`
   wrapped in `#ifndef MPEXT`; WinSCP's PuttyIntf.cpp supplies both under MPEXT (the engine build
   defines MPEXT), so the PuTTY originals would duplicate them at link.
 
 All other reconciliation is done outside source/ (native/putty/include shims, genprops, the
 rtlcompat/platform layers).
 
-## Phase 4 — neon (libs/neon) guarded portability fixes
+## Phase 4 â neon (libs/neon) guarded portability fixes
 
 The WinSCP neon fork conflates "WINSCP integration" with "Windows". We build neon natively with
 `-DWINSCP` (the engine/NeonIntf need the WinSCP hooks: NE_207_LIBERAL_ESCAPING, NE_DBG_WINSCP_*,
 etc), so the WINSCP branches that were written for Windows must be `_WIN32`-guarded. All are
 `#ifdef`-guarded so the upstream Windows build is byte-identical.
 
-- `libs/neon/src/ne_defs.h` — under `NE_LFS` (WebDAVFileSystem.cpp defines it) `off64_t` was only typedef'd for _MSC_VER/__BORLANDC__; added `#if !defined(_WIN32) && !defined(__BORLANDC__) typedef off_t off64_t;` (off_t is 64-bit on LP64).
-- `libs/neon/src/config.h` — the whole config is `#ifdef WIN32`. Added an `#else` (non-Windows)
+- `libs/neon/src/ne_defs.h` â under `NE_LFS` (WebDAVFileSystem.cpp defines it) `off64_t` was only typedef'd for _MSC_VER/__BORLANDC__; added `#if !defined(_WIN32) && !defined(__BORLANDC__) typedef off_t off64_t;` (off_t is 64-bit on LP64).
+- `libs/neon/src/config.h` â the whole config is `#ifdef WIN32`. Added an `#else` (non-Windows)
   branch that `#include "neon_config_unix.h"` (captured autotools output, lives in `native/neon/`).
   Without this, non-Windows builds get an empty config (no NE_FMT_*, no HAVE_*).
-- `libs/neon/src/ne_openssl.c` — `#include <windows.h>` (WinSCP Windows cert-store) wrapped in
+- `libs/neon/src/ne_openssl.c` â `#include <windows.h>` (WinSCP Windows cert-store) wrapped in
   `#ifdef _WIN32`.
-- `libs/neon/src/ne_socket.c` — three `#ifdef WINSCP` blocks using `ioctlsocket(fd, FIONBIO, …)`
+- `libs/neon/src/ne_socket.c` â three `#ifdef WINSCP` blocks using `ioctlsocket(fd, FIONBIO, â¦)`
   (Windows non-blocking-socket) changed to `#if defined(WINSCP) && defined(_WIN32)`, so unix takes
   the existing `#else` `fcntl(O_NONBLOCK)` path.
 
@@ -72,15 +72,15 @@ Result: all 26 portable `libs/neon/src/*.c` compile on clang/arm64; `native/neon
 produces `libneon.a`. (Linking into the engine + the WebDAV/S3 TUs is the next Phase 4 step; see
 STATUS.md.)
 
-## Phase 4 — Terminal.cpp WebDAV Open() un-guarded
+## Phase 4 â Terminal.cpp WebDAV Open() un-guarded
 
 `source/core/Terminal.cpp` TTerminal::Open(): the WebDAV branch's `#ifdef _WIN32` guard (which
 threw "WebDAV protocol is not supported on this build yet") is removed now that TWebDAVFileSystem
-builds natively — it unconditionally does `new TWebDAVFileSystem(this); Open()`. The FTP and S3
+builds natively â it unconditionally does `new TWebDAVFileSystem(this); Open()`. The FTP and S3
 branches remain guarded (those backends are not built yet). The Windows build is unaffected (it
 always ran this code). Marked `// WINSCP-NATIVE-PORT`.
 
-## Phase 4 — libs3 + Terminal.cpp S3 (guarded)
+## Phase 4 â libs3 + Terminal.cpp S3 (guarded)
 
 - `libs/libs3/src/request.c`: (1) the `SYSTEMTIME`/`GetSystemTime` request-date block (a WinSCP
   "PuTTY ltime" replacement) is `#ifdef _WIN32`-guarded; the `#else` uses `gmtime_r` (UTC). (2)
@@ -91,63 +91,78 @@ always ran this code). Marked `// WINSCP-NATIVE-PORT`.
 
 ## source/filezilla S_un.S_addr -> s_addr (FTP port)
 AsyncProxySocketLayer.cpp, FtpControlSocket.cpp: `sin_addr.S_un.S_addr` -> `sin_addr.s_addr`.
-Safe on Windows too — `<winsock2.h>` defines `#define s_addr S_un.S_addr`, so `.s_addr` is the
+Safe on Windows too â `<winsock2.h>` defines `#define s_addr S_un.S_addr`, so `.s_addr` is the
 portable spelling. Needed because POSIX `struct in_addr` has no `S_un` union member.
 
-## FTP backend (Phase 8) — guarded source edits
+## FTP backend (Phase 8) â guarded source edits
 - source/core/Terminal.cpp: un-guarded the fsFTP branch of TTerminal::Open() (FileZilla builds now).
 - source/core/FtpFileSystem.cpp: PreserveDownloadFileTime body `#ifdef _WIN32`-guarded (handle-type
   mismatch on the native CFile); DeleteFile falls back to File->FileName for trailing-slash dir paths
   (both `#ifndef _WIN32`).
 - source/filezilla/AsyncProxySocketLayer.cpp, FtpControlSocket.cpp: `sin_addr.S_un.S_addr` ->
   `sin_addr.s_addr` (portable; Windows winsock #defines s_addr to S_un.S_addr).
-- **source/core/Terminal.cpp** — added `FOperationProgress = NULL;` to the TTerminal constructor
-  init block (UNGUARDED — correct on every platform). The member was never initialized in the ctor,
+- **source/core/Terminal.cpp** â added `FOperationProgress = NULL;` to the TTerminal constructor
+  init block (UNGUARDED â correct on every platform). The member was never initialized in the ctor,
   only assigned during/after an operation (set at DoStartOperation, cleared at line ~4072). Before
   the first `StartOperationWithFile` (delete/chmod/SetProperties/remote-move/calculate-size),
   `TryStartOperationWithFile` reads `OperationProgress` (== FOperationProgress) and, if non-NULL,
-  dereferences `->Operation`. With the member uninitialized this was garbage → **nondeterministic
+  dereferences `->Operation`. With the member uninitialized this was garbage â **nondeterministic
   SIGSEGV on the first delete/chmod/etc.** (the crash a user hit "sometimes" deleting a file). Upstream
   relies on it being NULL (there's a `DebugAssert(FOperationProgress == NULL)` before the first set) but
-  never initializes it in the ctor — latent bug, masked on Windows by allocator zeroing / luck. Setting
+  never initializes it in the ctor â latent bug, masked on Windows by allocator zeroing / luck. Setting
   it NULL is what upstream already expects, so Windows behavior is unchanged.
-- **source/core/SessionInfo.cpp** — (1) `TSessionLog::DoAddStartupInfo` now null-checks
+- **source/core/SessionInfo.cpp** â (1) `TSessionLog::DoAddStartupInfo` now null-checks
   `GetGlobalOptions()` before `->LogOptions()`. On the native build `GetGlobalOptions()` returns NULL
-  (no command-line options parser — interface_stub.cpp), so enabling session logging
+  (no command-line options parser â interface_stub.cpp), so enabling session logging
   (`Configuration->Logging`) SIGSEGV'd on connect inside DoAddStartupInfo. Null is impossible on
   Windows (real options object), so unchanged there. (2) Added `fflush` after each log-line `fwrite`
   under `#ifndef _WIN32` so a stalled/killed session still leaves a complete log on disk.
 All keep the Windows build intact.
 
-## Native platform-layer fixes (native/putty/src — not upstream source/)
+## Native platform-layer fixes (native/putty/src â not upstream source/)
 
-- **native/putty/src/uxnet.c `ns_try_flush`** — now calls `plug_sent(s->plug, bufchain_size)` after
+- **native/putty/src/uxnet.c `ns_try_flush`** â now calls `plug_sent(s->plug, bufchain_size)` after
   the send backlog shrinks. PuTTY's `ssh_sent` (the plug `sent` callback) unthrottles the connection
   AND queues the next chunk of BPP output; without it, once the socket's send buffer backlogs (any
-  real/slow network) the transfer sent its first burst and then stalled forever — "Timeout waiting
+  real/slow network) the transfer sent its first burst and then stalled forever â "Timeout waiting
   for server to respond" at ~3%. It never reproduced on localhost because the loopback send buffer is
   huge + fast, so the socket never backlogged and `plug_sent` was never needed. Reproduced locally by
   forcing a tiny `SO_SNDBUF`. THE upload-stall bug.
-- **native/rtlcompat/src/Threading.cpp `WaitForMultipleObjects`** — `INFINITE` timeout was computed as
+- **native/rtlcompat/src/Threading.cpp `WaitForMultipleObjects`** â `INFINITE` timeout was computed as
   1 ms (so infinite waits returned spuriously after 1 ms). Now loops without a deadline when INFINITE.
 
-## Linux x86-64 port (clang 18 + libstdc++ + GNU ld) — guarded source/ edits
+## Linux x86-64 port (clang 18 + libstdc++ + GNU ld) â guarded source/ edits
 
 Surfaced bringing up the **Linux x64** build. All keep Windows and macOS byte-identical (guarded or a
-true no-op there). Most of the Linux work is in `native/` (no source edit) — see STATUS.md's Linux
+true no-op there). Most of the Linux work is in `native/` (no source edit) â see STATUS.md's Linux
 section. The two new `source/` touches (plus the defs.h `_WIN32` tightening above):
 
-- **source/core/Exceptions.h** — `ExtException::FMoreMessages` now has a `= nullptr` member
-  initializer (UNGUARDED — correct everywhere, same class as the `FOperationProgress` fix above).
+- **source/core/Exceptions.h** â `ExtException::FMoreMessages` now has a `= nullptr` member
+  initializer (UNGUARDED â correct everywhere, same class as the `FOperationProgress` fix above).
   `AddMoreMessages`/`QueryUserException` test `FMoreMessages == NULL` before allocating/using it, and
   ExtExceptions are usually **thrown as stack temporaries** (never heap-allocated). Delphi zero-fills
-  instance fields; standard C++ does not. On Linux (glibc malloc / stack) the field was garbage → the
+  instance fields; standard C++ does not. On Linux (glibc malloc / stack) the field was garbage â the
   error-reporting path crashed (`TStrings::Assign`/`->Count` on a garbage pointer) the moment any remote
   op returned an error (e.g. creating an existing dir, or the existence-probe during rename). macOS
-  happened to see zeroed memory; Windows (Borland zero-init) already gets NULL — explicit init changes
+  happened to see zeroed memory; Windows (Borland zero-init) already gets NULL â explicit init changes
   nothing there.
-- **source/core/Terminal.cpp** — the 1-arg `TTerminal::LogEvent(const UnicodeString&)` definition
+- **source/core/Terminal.cpp** â the 1-arg `TTerminal::LogEvent(const UnicodeString&)` definition
   carried a stray `inline`, so the compiler emitted no out-of-line symbol and cross-TU callers (e.g.
   WebDAVFileSystem) failed to link. Dropped the `inline` **only on Linux** via
   `#if defined(_WIN32) || defined(__APPLE__)`, so Windows and macOS keep the original token
   byte-for-byte; clang 18 + GNU ld discard the inline copy where macOS clang 14 + ld64 kept a weak one.
+
+## Native configuration persistence on POSIX
+
+- **source/core/Configuration.cpp** â `GetAutomaticIniFileStorageName` uses the per-user
+  configuration directory on non-Windows platforms. macOS application bundles and App
+  Translocation volumes are not valid writable configuration locations.
+- **source/core/HierarchicalStorage.cpp** â the POSIX `TIniFileStorage` destructor catches a
+  failed implicit flush. Standard C++ destructors are `noexcept`; allowing an I/O exception to
+  escape previously called `std::terminate` while accepting a new SSH host key.
+- **native/rtlcompat/src/Threading.cpp** â emulated Win32 wait handles now start at `0x10000`,
+  outside the POSIX file-descriptor range. `CloseHandle` closes a real descriptor when the value
+  is not an emulated object handle.
+- **native/rtlcompat/src/SysExtra.cpp** â `CreateFile` implements
+  `FILE_FLAG_DELETE_ON_CLOSE` by unlinking the opened file. This makes writability probes clean
+  up after themselves and works with the corrected `CloseHandle` implementation.

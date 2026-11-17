@@ -1837,7 +1837,19 @@ void __fastcall TIniFileStorage::Flush()
 //---------------------------------------------------------------------------
 __fastcall TIniFileStorage::~TIniFileStorage()
 {
+#ifndef _WIN32
+  // C++ destructors are noexcept by default.  A failed implicit save (for
+  // example from an App Translocation volume) must not terminate the process.
+  try
+  {
+    Flush();
+  }
+  catch (...)
+  {
+  }
+#else
   Flush();
+#endif
 }
 //---------------------------------------------------------------------------
 void __fastcall TIniFileStorage::ApplyOverrides()

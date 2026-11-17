@@ -1445,6 +1445,14 @@ UnicodeString __fastcall TConfiguration::GetAutomaticIniFileStorageName(bool Rea
 
   UnicodeString ProgramIniPath = ChangeFileExt(ProgramPath, L".ini");
 
+#ifndef _WIN32
+  // Application bundles and App Translocation paths are not configuration
+  // locations on macOS.  Store the INI in the per-user config directory.
+  // This also follows the native convention on Linux.
+  return IncludeTrailingBackslash(GetShellFolderPath(CSIDL_APPDATA)) +
+    ExtractFileName(ProgramIniPath);
+#endif
+
   UnicodeString IniPath;
   if (FileExists(ApiPath(ProgramIniPath)))
   {

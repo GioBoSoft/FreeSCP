@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-// Threading.cpp — Win32 thread/event emulation (std::thread + condition_variable) and the
+// Threading.cpp â Win32 thread/event emulation (std::thread + condition_variable) and the
 // engine's StartThread (declared in Interface.h). HANDLEs are integer ids in g_objects.
 //---------------------------------------------------------------------------
 #include "winscp/WinThreads.h"
@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <map>
 #include <chrono>
+#include <unistd.h>
 
 // Socket-readiness pump (WinSock.cpp): signals WSA event handles whose sockets are ready, so the
 // engine's WaitForMultipleObjects loop wakes on network activity. Weakly used; harmless if no
@@ -77,7 +78,10 @@ struct ThreadObject : WaitObject
 
 std::mutex g_mtx;
 std::map<int, WaitObject *> g_objects;
-int g_next = 1;
+// Keep emulated Win32 object handles away from small POSIX file descriptors.
+// CloseHandle receives both kinds from the ported engine, so overlapping values
+// could close an event when the caller intended to close a file (or vice versa).
+int g_next = 0x10000;
 
 int Register(WaitObject * o) { std::lock_guard<std::mutex> l(g_mtx); int id = g_next++; g_objects[id] = o; return id; }
 WaitObject * Lookup(HANDLE h) { std::lock_guard<std::mutex> l(g_mtx); auto it = g_objects.find((int)(NativeInt)h); return it == g_objects.end() ? nullptr : it->second; }
@@ -120,14 +124,24 @@ BOOL  __fastcall GetExitCodeThread(HANDLE Thread, DWORD * ExitCode)
 { auto * t = dynamic_cast<ThreadObject *>(Lookup(Thread)); if (t && ExitCode) *ExitCode = t->ExitCode; return t != nullptr; }
 BOOL  __fastcall TerminateThread(HANDLE, DWORD) { return FALSE; }  // unsafe on POSIX; no-op
 
-// CloseHandle for our objects (overrides the SysExtra stub via the linker? No — defined once
+// CloseHandle for our objects (overrides the SysExtra stub via the linker? No â defined once
 // here; SysExtra's stub is removed).
 BOOL __fastcall CloseHandle(HANDLE h)
 {
-  std::lock_guard<std::mutex> l(g_mtx);
-  auto it = g_objects.find((int)(NativeInt)h);
-  if (it != g_objects.end()) { delete it->second; g_objects.erase(it); }
-  return TRUE;
+  const int value = static_cast<int>(reinterpret_cast<NativeInt>(h));
+  {
+    std::lock_guard<std::mutex> l(g_mtx);
+    auto it = g_objects.find(value);
+    if (it != g_objects.end())
+    {
+      delete it->second;
+      g_objects.erase(it);
+      return TRUE;
+    }
+  }
+  // Native file HANDLEs are POSIX descriptors packed into the pointer value.
+  // Do not pass Win32 pseudo handles such as GetCurrentThread() to close(2).
+  return (value >= 0) && (::close(value) == 0);
 }
 
 // Engine's StartThread (Interface.h). Returns the thread HANDLE as int.

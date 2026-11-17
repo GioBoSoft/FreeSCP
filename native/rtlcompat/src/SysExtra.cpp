@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-// SysExtra.cpp — bodies for winscp/SysExtra.h.
+// SysExtra.cpp â bodies for winscp/SysExtra.h.
 //---------------------------------------------------------------------------
 #include "SysUtils.hpp"
 #include "winscp/SysExtra.h"
@@ -193,7 +193,7 @@ bool __fastcall FileAge(const UnicodeString & FileName, TDateTime & DateTime)
   return true;
 }
 // Parse an ISO-8601 timestamp ("YYYY-MM-DDThh:mm:ss[.fff][Z]") to TDateTime. ReturnUTC is honored
-// only trivially (the input is treated as already in the desired zone — sufficient for S3, which
+// only trivially (the input is treated as already in the desired zone â sufficient for S3, which
 // passes UTC strings and compares them against UTC).
 TDateTime __fastcall ISO8601ToDate(const UnicodeString & S, bool /*ReturnUTC*/)
 {
@@ -347,7 +347,7 @@ void  __fastcall SetLastError(DWORD) {}
 BOOL  __fastcall FileTimeToSystemTime(const FILETIME *, SYSTEMTIME * st) { if (st) std::memset(st, 0, sizeof(*st)); return TRUE; }
 BOOL  __fastcall FileTimeToLocalFileTime(const FILETIME * ft, FILETIME * lft) { if (lft && ft) *lft = *ft; return TRUE; }
 BOOL  __fastcall LocalFileTimeToFileTime(const FILETIME * lft, FILETIME * ft) { if (ft && lft) *ft = *lft; return TRUE; }
-// SYSTEMTIME (y/m/d h:m:s, treated as UTC — local==UTC simplification, matching the passthrough
+// SYSTEMTIME (y/m/d h:m:s, treated as UTC â local==UTC simplification, matching the passthrough
 // FileTimeToLocalFileTime) -> FILETIME (100ns ticks since 1601-01-01).
 BOOL  __fastcall SystemTimeToFileTime(const SYSTEMTIME * st, FILETIME * ft)
 {
@@ -538,7 +538,7 @@ const wchar_t * __fastcall PathSkipRoot(const wchar_t * Path) { return Path; }
 bool __fastcall FileGetSymLinkTarget(const UnicodeString & FileName, UnicodeString & Target)
 { std::error_code ec; auto t = fs::read_symlink(ToU8(FileName), ec); if (ec) return false; Target = FromU8(t.string()); return true; }
 HANDLE __fastcall CreateFile(const wchar_t * FileName, DWORD Access, DWORD /*Share*/, void * /*Sec*/,
-                             DWORD Disposition, DWORD /*Flags*/, HANDLE /*Template*/)
+                             DWORD Disposition, DWORD Flags, HANDLE /*Template*/)
 {
   int flags = 0;
   bool rd = (Access & GENERIC_READ) != 0, wr = (Access & GENERIC_WRITE) != 0;
@@ -552,6 +552,8 @@ HANDLE __fastcall CreateFile(const wchar_t * FileName, DWORD Access, DWORD /*Sha
   }
   int fd = ::open(ToU8(UnicodeString(FileName)).c_str(), flags, 0644);
   if (fd < 0) { SetLastError((DWORD)errno); return INVALID_HANDLE_VALUE; }
+  if ((Flags & FILE_FLAG_DELETE_ON_CLOSE) != 0)
+    ::unlink(ToU8(UnicodeString(FileName)).c_str());
   return reinterpret_cast<HANDLE>((intptr_t)fd);   // fd packed in a HANDLE (see FileSeek/TSafeHandleStream)
 }
 // Our HANDLE already IS the fd (packed via intptr_t), so _open_osfhandle just unpacks it.
@@ -641,7 +643,7 @@ void __fastcall TDateTime::DecodeTime(Word * H, Word * M, Word * S, Word * MS) c
   if (MS) *MS = (Word)(ms % 1000); ms /= 1000; if (S) *S = (Word)(ms % 60); ms /= 60;
   if (M) *M = (Word)(ms % 60); if (H) *H = (Word)(ms / 60); }
 
-// No real PE version resource on the native port — synthesize a VS_FIXEDFILEINFO so the engine's
+// No real PE version resource on the native port â synthesize a VS_FIXEDFILEINFO so the engine's
 // version queries succeed. The info block buffer simply IS a VS_FIXEDFILEINFO; VerQueryValue("\\")
 // returns it. Other sub-queries (translations/strings) report absent.
 #define WINSCP_NATIVE_FILEVER_MS ((6u << 16) | 3u)   /* 6.3.x.x */
